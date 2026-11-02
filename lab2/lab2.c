@@ -1,200 +1,244 @@
 #include <stdio.h>
-#include <locale.h>
 #include <math.h>
+#include <stdbool.h>
 
-#define PI acos(-1.0)
-
-double readDoubleConsole(void) {
-    double num = 0.0;
-    char symbol = '\0';
-    int scanResult = 0, isIncorrect = 0;
-    do {
-        isIncorrect = 0;
-        scanResult = scanf("%lf%c", &num, &symbol);
-        if (scanResult != 2 || symbol != '\n' || !isfinite(num)) {
-            isIncorrect = 1;
-            printf("Ошибка ввода. Попробуйте ещё раз:\n");
-            while (getchar() != '\n');
-        }
-    } while (isIncorrect);
-    return num;
-}
-
-double checkDoubleConsole(int min, int max) {
-    double num = 0.0;
-    int isIncorrect = 0;
-    do {
-        isIncorrect = 0;
-        num = readDoubleConsole();
-        if (num < min || num > max) {
-            isIncorrect = 1;
-            printf("Число должно быть от %d до %d. Попробуйте ещё раз:\n", min, max);
-        }
-    } while (isIncorrect);
-    return num;
-}
-
-void readValues(double *a, double *b, double *h, double *z, int *pointsQuantity, int min, int max, int maxPoints) {
-    int isIncorrect = 0;
-    double points = 0.0;
-    do {
-        isIncorrect = 0;
-        printf("Введите начало диапазона a (от %d до %d):\n", min, max);
-        *a = checkDoubleConsole(min, max);
-
-        printf("Введите конец диапазона b (от %d до %d):\n", min, max);
-        *b = checkDoubleConsole(min, max);
-
-        printf("Введите шаг h (больше 0, не больше %d):\n", max);
-        *h = checkDoubleConsole(0, max);
-
-        if (*a > *b || *h <= 0) {
-            isIncorrect = 1;
-            printf("Требуется a <= b и h > 0. Повторите ввод диапазона.\n");
-        } 
-        else {
-            points = floor((*b - *a) / *h) + 1.0;
-            if (!isfinite(points) || points < 1.0 || points > maxPoints) {
-                isIncorrect = 1;
-                printf("Количество точек должно быть от 1 до %d. Повторите ввод.\n", maxPoints);
-            } 
-            else {
-                *pointsQuantity = (int)points;
-            }
-        }
-    } while (isIncorrect);
-
-    printf("Введите z для вычисления exp(z) (например, от -10 до 10):\n");
-    *z = checkDoubleConsole(-100, 100);
-}
-
-int checkDomain(double x, double domainEps) {
-    // Знаменатель x не должен быть равен 0
-    return fabs(x) > domainEps;
-}
-
-double findFormula(double x) {
-    return log(cbrt(x * x + PI)) + atan(x / 3.0) + (exp(5.0 / 3.0) / x);
-}
-
-void printValue(double x, double y, int isDefined) {
-    if (isDefined) {
-        printf("%14.6f | %16.10f\n", x, y);
-    } 
-    else {
-        printf("%14.6f | UNDEFINED\n", x);
-    }
-}
-
-void processTable(double a, double h, int pointsQuantity, double domainEps, int *validCount, int *invalidCount, double *minY, double *maxY, double *averageY) {
-    int i = 0, isDefined = 0;
-    double x = 0.0, y = 0.0, sum = 0.0;
-    *validCount = 0;
-    *invalidCount = 0;
-    *minY = 0.0;
-    *maxY = 0.0;
-    *averageY = 0.0;
-
-    for (i = 0; i < pointsQuantity; i++) {
-        x = a + i * h;
-        y = 0.0;
-        isDefined = checkDomain(x, domainEps);
-
-        if (isDefined) {
-            y = findFormula(x);
-            if (*validCount == 0 || y < *minY) {
-                *minY = y;
-            }
-            if (*validCount == 0 || y > *maxY) {
-                *maxY = y;
-            }
-            sum = sum + y;
-            (*validCount)++;
-        } 
-        else {
-            (*invalidCount)++;
-        }
-        printValue(x, y, isDefined);
-    }
-
-    if (*validCount > 0) {
-        *averageY = sum / *validCount;
-    }
-}
-
-void findIteration(double z, double eps, int maxIterations, double *approximation, int *iterations, double *reference, double *difference, int *isConverged) {
-    double term = 1.0;
-    *approximation = 1.0;
-    *iterations = 0;
-
-    while (fabs(term) > eps && *iterations < maxIterations) {
-        (*iterations)++;
-        term = term * z / *iterations;
-        *approximation = *approximation + term;
-    }
-
-    *isConverged = (fabs(term) <= eps);
-    *reference = exp(z);
-    *difference = fabs(*approximation - *reference);
-}
-
-void printInput(double a, double b, double h, double z, int pointsQuantity, double eps) {
-    printf("\nИсходные данные:\n");
-    printf("a = %f; b = %f; h = %f\n", a, b, h);
-    printf("Количество точек: %d\n", pointsQuantity);
-    printf("z = %f; eps = %f\n", z, eps);
-
-    printf("\nТаблица значений:\n");
-    printf("             x |                y\n");
-}
-
-void printStatistics(int validCount, int invalidCount, double minY, double maxY, double averageY) {
-    printf("\nСтатистика:\n");
-    printf("Допустимых точек = %d\n", validCount);
-    printf("Недопустимых точек = %d\n", invalidCount);
-
-    if (validCount > 0) {
-        printf("Минимальный y = %.10f\n", minY);
-        printf("Максимальный y = %.10f\n", maxY);
-        printf("Средний y = %.10f\n", averageY);
-    } 
-    else {
-        printf("Допустимых точек нет. Минимум, максимум и среднее не определены.\n");
-    }
-}
-
-void printOutput(double approximation, double reference, double difference, int iterations, int isConverged) {
-    printf("\nИтерационное вычисление exp(z):\n");
-    printf("Приближённое значение: %.10f\n", approximation);
-    printf("Значение exp(z):       %.10f\n", reference);
-    printf("Абсолютная разность:   %.10f\n", difference);
-    printf("Количество членов N:   %d\n", iterations);
-
-    if (!isConverged) {
-        printf("Достигнут лимит итераций. Требуемая точность не достигнута.\n");
-    }
-}
+#define PI 3.14159265358979323846
+#define DOMAIN_EPS 1e-9
+#define MIN_POINTS 1
+#define MAX_POINTS 1000
+#define MAX_ITERATIONS 100000
+#define EPS_1 1e-2
+#define EPS_2 1e-3
+#define EPS_3 1e-4
+#define EPS_COUNT 3
 
 int main(void) {
-    const int MIN_INPUT = -1000000;
-    const int MAX_INPUT = 1000000;
-    const int MAX_POINTS = 1000;
-    const int MAX_ITERATIONS = 100000;
-    const double DOMAIN_EPS = 0.000000001;
-    const double EPS = 0.0001;
+    double a, b, h, sumY, minY, maxY;
+    double calculatedPointsCount;
+    double x, y;
+    double argumentLog, atanArgument, thirdTerm;
+    double averageY;
+    double eps, seriesSum, currentTerm, exactValue, difference;
+    double z;
 
-    double a = 0.0, b = 0.0, h = 0.0, z = 0.0;
-    double minY = 0.0, maxY = 0.0, averageY = 0.0;
-    double approximation = 0.0, reference = 0.0, difference = 0.0;
-    int pointsQuantity = 0, validCount = 0, invalidCount = 0, iterations = 0, isConverged = 0;
+    int pointsCount, validCount, invalidCount;
+    int epsIndex, termsCount;
+    int scanResult, inputCharacter;
+    int pointIndex;
 
-    setlocale(LC_CTYPE, ".UTF-8");
-    readValues(&a, &b, &h, &z, &pointsQuantity, MIN_INPUT, MAX_INPUT, MAX_POINTS);
-    printInput(a, b, h, z, pointsQuantity, EPS);
-    processTable(a, h, pointsQuantity, DOMAIN_EPS, &validCount, &invalidCount, &minY, &maxY, &averageY);
-    printStatistics(validCount, invalidCount, minY, maxY, averageY);
-    findIteration(z, EPS, MAX_ITERATIONS, &approximation, &iterations, &reference, &difference, &isConverged);
-    printOutput(approximation, reference, difference, iterations, isConverged);
+    bool isInvalidInput, isBufferCleared;
+    bool isIntervalIncorrect, isParametersCorrect;
+
+    sumY = 0.0;
+    pointsCount = 0;
+    validCount = 0;
+    invalidCount = 0;
+
+    isInvalidInput = false;
+    isBufferCleared = false;
+    isIntervalIncorrect = true;
+    isParametersCorrect = false;
+
+    printf("Часть А: таблица значений функции на отрезке [a; b].\n");
+    printf("y = ln(cbrt(x^2 + pi)) + atan(x / 3) + exp(5.0 / 3) / x\n");
+    printf("Часть В: итерационное вычисление exp(z).\n\n");
+
+    while (isIntervalIncorrect) {
+        printf("Введите a: ");
+        isInvalidInput = true;
+        while (isInvalidInput) {
+            scanResult = scanf("%lf", &a);
+            if (scanResult == 1) {
+                if (a < -1000.0 || a > 1000.0) {
+                    printf("Вы вышли за возможный диапазон. Введите число от -1000.00 до 1000.00: ");
+                } else {
+                    isInvalidInput = false;
+                }
+            } else {
+                printf("Ошибка ввода. Введите вещественное число от -1000.00 до 1000.00: ");
+                isBufferCleared = true;
+                while (isBufferCleared) {
+                    inputCharacter = getchar();
+                    if (inputCharacter == '\n' || inputCharacter == EOF) {
+                        isBufferCleared = false;
+                    }
+                }
+            }
+        }
+
+        printf("Введите b: ");
+        isInvalidInput = true;
+        while (isInvalidInput) {
+            scanResult = scanf("%lf", &b);
+            if (scanResult == 1) {
+                if (b < -1000.0 || b > 1000.0) {
+                    printf("Вы вышли за возможный диапазон. Введите число от -1000.00 до 1000.00: ");
+                } else {
+                    isInvalidInput = false;
+                }
+            } else {
+                printf("Ошибка ввода. Введите вещественное число от -1000.00 до 1000.00: ");
+                isBufferCleared = true;
+                while (isBufferCleared) {
+                    inputCharacter = getchar();
+                    if (inputCharacter == '\n' || inputCharacter == EOF) {
+                        isBufferCleared = false;
+                    }
+                }
+            }
+        }
+
+        if (a > b) {
+            printf("Ошибка: должно выполняться a <= b. Введите a и b снова.\n");
+        } else {
+            isIntervalIncorrect = false;
+        }
+    }
+
+    printf("Введите h: ");
+    isInvalidInput = true;
+    while (isInvalidInput) {
+        scanResult = scanf("%lf", &h);
+        if (scanResult == 1) {
+            if (h < 0.01 || h > 100.0) {
+                printf("Вы вышли за возможный диапазон. Введите число от 0.01 до 100.00: ");
+            } else {
+                isInvalidInput = false;
+            }
+        } else {
+            printf("Ошибка ввода. Введите вещественное число от 0.01 до 100.00: ");
+            isBufferCleared = true;
+            while (isBufferCleared) {
+                inputCharacter = getchar();
+                if (inputCharacter == '\n' || inputCharacter == EOF) {
+                    isBufferCleared = false;
+                }
+            }
+        }
+    }
+
+    calculatedPointsCount = floor((b - a) / h) + 1.0;
+
+    if (calculatedPointsCount >= (double)MIN_POINTS && calculatedPointsCount <= (double)MAX_POINTS) {
+        pointsCount = (int)calculatedPointsCount;
+        isParametersCorrect = true;
+    } else {
+        printf("Ошибка: количество точек должно быть от %d до %d.\n", MIN_POINTS, MAX_POINTS);
+    }
+
+    if (isParametersCorrect) {
+        printf("\n%-12s | %-16s\n", "x", "y");
+        printf("--------------------------------\n");
+
+        for (pointIndex = 0; pointIndex < pointsCount; pointIndex++) {
+            x = a + (double)pointIndex * h;
+
+            if (fabs(x) > DOMAIN_EPS) {
+                argumentLog = cbrt(x * x + PI);
+                atanArgument = x / 3.0;
+                thirdTerm = exp(5.0 / 3.0) / x;
+
+                y = log(argumentLog) + atan(atanArgument) + thirdTerm;
+
+                printf("%-12.4lf | %-16.6lf\n", x, y);
+
+                if (validCount == 0) {
+                    minY = y;
+                    maxY = y;
+                } else {
+                    if (y < minY) {
+                        minY = y;
+                    }
+                    if (y > maxY) {
+                        maxY = y;
+                    }
+                }
+
+                    sumY = sumY + y;
+                    validCount++;
+            } else {
+                printf("%-12.4lf | %-16s\n", x, "UNDEFINED");
+                invalidCount++;
+            }
+        }
+
+        printf("--------------------------------\n");
+        printf("valid_count: %d\n", validCount);
+        printf("invalid_count: %d\n", invalidCount);
+
+        if (validCount > 0) {
+            averageY = sumY / (double)validCount;
+            printf("min_y: %.6lf\n", minY);
+            printf("max_y: %.6lf\n", maxY);
+            printf("average_y: %.6lf\n", averageY);
+        } else {
+            printf("Статистика недоступна: нет допустимых точек.\n");
+        }
+
+        printf("\nЧасть В: итерационное вычисление exp(z).\n");
+        printf("Введите z: ");
+
+        isInvalidInput = true;
+        while (isInvalidInput) {
+            scanResult = scanf("%lf", &z);
+            if (scanResult == 1) {
+                if (z < -100.0 || z > 100.0) {
+                    printf("Вы вышли за возможный диапазон. Введите число от -100.0 до 100.0: ");
+                } else {
+                    isInvalidInput = false;
+                }
+            } else {
+                printf("Ошибка ввода. Введите вещественное число: ");
+                isBufferCleared = true;
+                while (isBufferCleared) {
+                    inputCharacter = getchar();
+                    if (inputCharacter == '\n' || inputCharacter == EOF) {
+                        isBufferCleared = false;
+                    }
+                }
+            }
+        }
+
+        exactValue = exp(z);
+
+        printf("\n%-10s | %-23s | %-14s | %-22s | %-8s | %s\n", 
+               "eps", "Сумма ряда", "exp(z)", "Разность", "N", "Статус");
+        printf("--------------------------------------------------------------------------------\n");
+
+        epsIndex = 0;
+        while (epsIndex < EPS_COUNT) {
+            eps = EPS_1;
+            if (epsIndex == 1) {
+                eps = EPS_2;
+            } else if (epsIndex == 2) {
+                eps = EPS_3;
+            }
+
+            seriesSum = 0.0;
+            currentTerm = 1.0;
+            termsCount = 0;
+
+            while (fabs(currentTerm) > eps && (termsCount < MAX_ITERATIONS)) {
+                seriesSum = seriesSum + currentTerm;
+                termsCount++;
+                currentTerm = currentTerm * z / (double)termsCount;
+            }
+
+            difference = fabs(seriesSum - exactValue);
+
+            if (termsCount >= MAX_ITERATIONS) {
+                printf("%-10g | %-14.8lf | %-14.8lf | %-14.6g | %-8d | TIMEOUT\n", 
+                       eps, seriesSum, exactValue, difference, termsCount);
+            } else {
+                printf("%-10g | %-14.8lf | %-14.8lf | %-14.6g | %-8d | SUCCESS\n", 
+                       eps, seriesSum, exactValue, difference, termsCount);
+            }
+
+            epsIndex++;
+        }
+
+        printf("--------------------------------------------------------------------------------\n");
+    }
 
     return 0;
 }
